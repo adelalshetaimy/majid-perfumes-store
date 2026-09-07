@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    font-family: 'Tajawal', sans-serif;
+    background-color: #F5EDE0;
+    color: #2A211A;
+  }
+  h1, h2, h3, h4, h5 {
+    font-family: 'Cairo', sans-serif;
+  }
+  ::selection {
+    background-color: #8B6F47;
+    color: #F5EDE0;
+  }
+}
+
+@layer utilities {
+  .container-lux {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-bronze-500 px-6 py-3 font-display text-sm font-semibold text-cream-50 shadow-soft transition-all hover:bg-bronze-600 hover:shadow-card active:scale-95 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-bronze-300 bg-transparent px-6 py-3 font-display text-sm font-semibold text-bronze-600 transition-all hover:bg-bronze-50 active:scale-95;
+  }
+  .input-lux {
+    @apply w-full rounded-xl border border-bronze-200 bg-cream-50 px-4 py-3 text-ink-800 placeholder:text-bronze-400 focus:border-bronze-400 focus:outline-none focus:ring-2 focus:ring-bronze-200 transition;
+  }
+  .card-lux {
+    @apply rounded-2xl bg-cream-50 shadow-soft transition-all duration-300;
+  }
+  .label-lux {
+    @apply mb-1.5 block font-display text-sm font-semibold text-bronze-700;
+  }
+  .link-underline {
+    @apply relative after:absolute after:bottom-0 after:right-0 after:h-px after:w-0 after:bg-bronze-500 after:transition-all hover:after:w-full;
+  }
+}
+
+/* Hide scrollbar for horizontal category bar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
