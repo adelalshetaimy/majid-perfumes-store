@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase, type Product, type Review, type Order, formatPrice } from '@/lib/supabase';
-import { Loader2, LogOut, Package, Star, Users, Plus, Pencil, Trash2, Download, X, Check } from 'lucide-react';
+import { supabase, type Product, type Review, type Order, type Category, formatPrice } from '@/lib/supabase';
+import { Loader2, LogOut, Package, Star, Users, Plus, Pencil, Trash2, Download, X, Check, Tag, ArrowUp, ArrowDown, EyeOff, Eye } from 'lucide-react';
 
-type Tab = 'products' | 'reviews' | 'orders';
+type Tab = 'products' | 'categories' | 'reviews' | 'orders';
 
 export default function AdminDashboard() {
   const { session, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('products');
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -23,10 +24,12 @@ export default function AdminDashboard() {
     if (!session) return;
     Promise.all([
       supabase.from('products').select('*').order('created_at', { ascending: false }),
+      supabase.from('categories').select('*').order('display_order', { ascending: true }),
       supabase.from('reviews').select('*').order('created_at', { ascending: false }),
       supabase.from('orders').select('*').order('created_at', { ascending: false }),
-    ]).then(([p, r, o]) => {
+    ]).then(([p, c, r, o]) => {
       if (p.data) setProducts(p.data as Product[]);
+      if (c.data) setCategories(c.data as Category[]);
       if (r.data) setReviews(r.data as Review[]);
       if (o.data) setOrders(o.data as Order[]);
       setDataLoading(false);
@@ -98,14 +101,15 @@ export default function AdminDashboard() {
         {/* Stats */}
         <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard icon={<Package size={20} />} label="المنتجات" value={products.length} />
+          <StatCard icon={<Tag size={20} />} label="الأقسام" value={categories.length} />
           <StatCard icon={<Star size={20} />} label="الآراء" value={reviews.length} />
           <StatCard icon={<Users size={20} />} label="الطلبات" value={orders.length} />
-          <StatCard icon={<Check size={20} />} label="موافقون على العروض" value={orders.filter((o) => o.marketing_consent).length} />
         </div>
 
         {/* Tabs */}
         <div className="mb-6 flex gap-2 overflow-x-auto no-scrollbar">
           <TabButton active={tab === 'products'} onClick={() => setTab('products')} icon={<Package size={16} />} label="المنتجات" />
+          <TabButton active={tab === 'categories'} onClick={() => setTab('categories')} icon={<Tag size={16} />} label="الأقسام" />
           <TabButton active={tab === 'reviews'} onClick={() => setTab('reviews')} icon={<Star size={16} />} label="الآراء" />
           <TabButton active={tab === 'orders'} onClick={() => setTab('orders')} icon={<Users size={16} />} label="العملاء والطلبات" />
         </div>
@@ -115,7 +119,9 @@ export default function AdminDashboard() {
             <Loader2 className="animate-spin text-bronze-500" size={32} />
           </div>
         ) : tab === 'products' ? (
-          <ProductsTab products={products} onUpdate={setProducts} />
+          <ProductsTab products={products} categories={categories} onUpdate={setProducts} />
+        ) : tab === 'categories' ? (
+          <CategoriesTab categories={categories} onUpdate={setCategories} />
         ) : tab === 'reviews' ? (
           <ReviewsTab reviews={reviews} onUpdate={setReviews} />
         ) : (
@@ -151,8 +157,191 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
   );
 }
 
+/* ===== Categories Tab ===== */
+function CategoriesTab({ categories, onUpdate }: { categories: Category[]; onUpdate: (c: Category[]) => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Category | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const sorted = [...categories].sort((a, b) => a.display_order - b.display_order);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا القسم؟ لن يتم حذف المنتجات المرتبطة به، لكنها ستفقد قسمها.')) return;
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+    if (!error) onUpdate(categories.filter((c) => c.id !== id));
+  };
+
+  const handleToggleActive = async (cat: Category) => {
+    setBusyId(cat.id);
+    const { error } = await supabase.from('categories').update({ is_active: !cat.is_active }).eq('id', cat.id);
+    if (!error) onUpdate(categories.map((c) => (c.id === cat.id ? { ...c, is_active: !c.is_active } : c)));
+    setBusyId(null);
+  };
+
+  const handleMove = async (cat: Category, direction: 'up' | 'down') => {
+    const idx = sorted.findIndex((c) => c.id === cat.id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const other = sorted[swapIdx];
+
+    setBusyId(cat.id);
+    const [res1, res2] = await Promise.all([
+      supabase.from('categories').update({ display_order: other.display_order }).eq('id', cat.id),
+      supabase.from('categories').update({ display_order: cat.display_order }).eq('id', other.id),
+    ]);
+    if (!res1.error && !res2.error) {
+      onUpdate(
+        categories.map((c) => {
+          if (c.id === cat.id) return { ...c, display_order: other.display_order };
+          if (c.id === other.id) return { ...c, display_order: cat.display_order };
+          return c;
+        })
+      );
+    }
+    setBusyId(null);
+  };
+
+  return (
+    <div>
+      <div className="mb-4 flex justify-end">
+        <button onClick={() => { setEditing(null); setShowForm(true); }} className="btn-primary">
+          <Plus size={18} /> إضافة قسم
+        </button>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="py-20 text-center text-bronze-500">لا توجد أقسام بعد.</div>
+      ) : (
+        <div className="card-lux divide-y divide-bronze-100 overflow-hidden">
+          {sorted.map((cat, idx) => (
+            <div key={cat.id} className="flex items-center justify-between gap-3 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col">
+                  <button
+                    disabled={idx === 0 || busyId === cat.id}
+                    onClick={() => handleMove(cat, 'up')}
+                    className="text-bronze-400 transition hover:text-bronze-600 disabled:opacity-30"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                  <button
+                    disabled={idx === sorted.length - 1 || busyId === cat.id}
+                    onClick={() => handleMove(cat, 'down')}
+                    className="text-bronze-400 transition hover:text-bronze-600 disabled:opacity-30"
+                  >
+                    <ArrowDown size={16} />
+                  </button>
+                </div>
+                <div>
+                  <p className="font-display font-bold text-bronze-700">{cat.name}</p>
+                  {!cat.is_active && <span className="text-xs text-red-500">مخفي عن الموقع</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleToggleActive(cat)}
+                  disabled={busyId === cat.id}
+                  className="rounded-lg border border-bronze-200 p-2 text-bronze-600 transition hover:bg-bronze-50"
+                  title={cat.is_active ? 'إخفاء القسم' : 'إظهار القسم'}
+                >
+                  {cat.is_active ? <Eye size={16} /> : <EyeOff size={16} />}
+                </button>
+                <button
+                  onClick={() => { setEditing(cat); setShowForm(true); }}
+                  className="rounded-lg border border-bronze-200 p-2 text-bronze-600 transition hover:bg-bronze-50"
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
+                  onClick={() => handleDelete(cat.id)}
+                  className="rounded-lg border border-red-200 p-2 text-red-600 transition hover:bg-red-50"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <CategoryForm
+          category={editing}
+          maxOrder={categories.length > 0 ? Math.max(...categories.map((c) => c.display_order)) : 0}
+          onClose={() => setShowForm(false)}
+          onSave={(saved) => {
+            if (editing) {
+              onUpdate(categories.map((c) => (c.id === saved.id ? saved : c)));
+            } else {
+              onUpdate([...categories, saved]);
+            }
+            setShowForm(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CategoryForm({ category, maxOrder, onClose, onSave }: { category: Category | null; maxOrder: number; onClose: () => void; onSave: (c: Category) => void }) {
+  const [name, setName] = useState(category?.name ?? '');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+
+    let result;
+    if (category) {
+      result = await supabase.from('categories').update({ name }).eq('id', category.id).select().single();
+    } else {
+      result = await supabase
+        .from('categories')
+        .insert({ name, display_order: maxOrder + 1, is_active: true })
+        .select()
+        .single();
+    }
+
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error.message.includes('duplicate') ? 'يوجد قسم بنفس الاسم بالفعل' : 'فشل حفظ القسم');
+      return;
+    }
+    onSave(result.data as Category);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="card-lux w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold text-bronze-700">{category ? 'تعديل قسم' : 'قسم جديد'}</h2>
+          <button onClick={onClose} className="text-bronze-400 hover:text-bronze-600"><X size={20} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="label-lux">اسم القسم *</label>
+            <input required value={name} onChange={(e) => setName(e.target.value)} className="input-lux" placeholder="مثال: ساعات" />
+          </div>
+
+          {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+          <div className="flex gap-3 pt-2">
+            <button type="submit" disabled={submitting} className="btn-primary flex-1">
+              {submitting ? <Loader2 size={18} className="animate-spin" /> : 'حفظ'}
+            </button>
+            <button type="button" onClick={onClose} className="btn-outline">إلغاء</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ===== Products Tab ===== */
-function ProductsTab({ products, onUpdate }: { products: Product[]; onUpdate: (p: Product[]) => void }) {
+function ProductsTab({ products, categories, onUpdate }: { products: Product[]; categories: Category[]; onUpdate: (p: Product[]) => void }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
 
@@ -202,6 +391,7 @@ function ProductsTab({ products, onUpdate }: { products: Product[]; onUpdate: (p
       {showForm && (
         <ProductForm
           product={editing}
+          categories={categories}
           onClose={() => setShowForm(false)}
           onSave={(saved) => {
             if (editing) {
@@ -217,13 +407,16 @@ function ProductsTab({ products, onUpdate }: { products: Product[]; onUpdate: (p
   );
 }
 
-function ProductForm({ product, onClose, onSave }: { product: Product | null; onClose: () => void; onSave: (p: Product) => void }) {
+function ProductForm({ product, categories, onClose, onSave }: { product: Product | null; categories: Category[]; onClose: () => void; onSave: (p: Product) => void }) {
+  const activeCategories = categories.filter((c) => c.is_active).sort((a, b) => a.display_order - b.display_order);
+  const defaultCategory = product?.category ?? activeCategories[0]?.name ?? '';
+
   const [form, setForm] = useState({
     name: product?.name ?? '',
     price: product?.price?.toString() ?? '',
     sale_price: product?.sale_price?.toString() ?? '',
     currency: product?.currency ?? 'ريال يمني',
-    category: product?.category ?? 'عطور رجالية',
+    category: defaultCategory,
     description: product?.description ?? '',
     image_url: product?.image_url ?? '',
     availability: product?.availability ?? 'متاح',
@@ -252,12 +445,15 @@ function ProductForm({ product, onClose, onSave }: { product: Product | null; on
     setSubmitting(true);
     setError('');
 
+    const matchedCategory = categories.find((c) => c.name === form.category);
+
     const payload = {
       name: form.name,
       price: parseFloat(form.price),
       sale_price: form.sale_price ? parseFloat(form.sale_price) : null,
       currency: form.currency,
       category: form.category,
+      category_id: matchedCategory?.id ?? null,
       description: form.description,
       image_url: form.image_url,
       availability: form.availability,
@@ -320,10 +516,10 @@ function ProductForm({ product, onClose, onSave }: { product: Product | null; on
           <div>
             <label className="label-lux">الفئة *</label>
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input-lux">
-              <option value="عطور رجالية">عطور رجالية</option>
-              <option value="عطور نسائية">عطور نسائية</option>
-              <option value="هدايا وبكجات">هدايا وبكجات</option>
-              <option value="معطرات الجسم">معطرات الجسم</option>
+              {activeCategories.length === 0 && <option value="">لا توجد أقسام — أضف قسماً أولاً من تبويب الأقسام</option>}
+              {activeCategories.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
             </select>
           </div>
 
