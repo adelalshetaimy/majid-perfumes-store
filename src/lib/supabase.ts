@@ -19,9 +19,18 @@ export type Product = {
   sale_price: number | null;
   currency: string;
   category: string;
+  category_id: string | null;
   description: string;
   image_url: string;
   availability: string;
+  created_at: string;
+};
+
+export type Category = {
+  id: string;
+  name: string;
+  display_order: number;
+  is_active: boolean;
   created_at: string;
 };
 
@@ -56,13 +65,15 @@ export type Order = {
   created_at: string;
 };
 
-export const CATEGORIES = [
-  'الكل',
-  'عطور رجالية',
-  'عطور نسائية',
-  'هدايا وبكجات',
-  'معطرات الجسم',
-] as const;
+export async function fetchActiveCategories(): Promise<Category[]> {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('is_active', true)
+    .order('display_order', { ascending: true });
+  if (error || !data) return [];
+  return data as Category[];
+}
 
 export function formatPrice(price: number, currency: string): string {
   const formatted = Number(price).toLocaleString('ar-EG', { maximumFractionDigits: 0 });
