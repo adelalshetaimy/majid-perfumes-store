@@ -81,4 +81,94 @@ export default function HomePage() {
 
       {/* Products with filter */}
       <section id="products" className="container-lux py-12">
-        <div className="mb-8
+        <div className="mb-8 text-center">
+          <h2 className="font-display text-2xl font-bold text-bronze-700 md:text-3xl">مجموعتنا</h2>
+          <p className="mt-2 text-sm text-bronze-500">اختر فئتك المفضلة واكتشف عطرك</p>
+        </div>
+
+        {/* Search */}
+        <div className="mx-auto mb-6 max-w-md">
+          <div className="relative">
+            <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-bronze-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث عن عطر..."
+              className="input-lux pr-11"
+            />
+          </div>
+        </div>
+
+        {/* Category filter */}
+        <div className="no-scrollbar mb-10 flex justify-center gap-2 overflow-x-auto pb-2">
+          {categoryNames.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={`whitespace-nowrap rounded-full px-5 py-2 font-display text-sm font-semibold transition-all ${
+                category === cat
+                  ? 'bg-bronze-500 text-cream-50 shadow-soft'
+                  : 'bg-cream-50 text-bronze-600 hover:bg-bronze-50'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="aspect-square animate-pulse rounded-2xl bg-cream-200" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-20 text-center text-bronze-500">
+            لا توجد منتجات مطابقة.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
+            {filtered.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* About */}
+      <section id="about" className="bg-cream-100 py-16">
+        <div className="container-lux grid items-center gap-10 md:grid-cols-2">
+          <div>
+            <h2 className="font-display text-2xl font-bold text-bronze-700 md:text-3xl">فن صناعة العطور</h2>
+            <p className="mt-4 leading-relaxed text-bronze-600">
+              في مجيد للعطور، نؤمن أن العطر ليس مجرد رائحة، بل هو ذاكرة وهوية. نختار أجود المواد الطبيعية من العود الكمبودي والمسك الأبيض والورد الطائفي، ونمزجها بحرفية عالية لنقدم لك عطوراً تدوم وتلامس الروح.
+            </p>
+            <div className="mt-8 grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <Award className="mx-auto text-bronze-500" size={28} />
+                <p className="mt-2 font-display text-sm font-bold text-bronze-700">جودة فاخرة</p>
+              </div>
+              <div className="text-center">
+                <FlaskConical className="mx-auto text-bronze-500" size={28} />
+                <p className="mt-2 font-display text-sm font-bold text-bronze-700">خلط حرفي</p>
+              </div>
+              <div className="text-center">
+                <Sparkles className="mx-auto text-bronze-500" size={28} />
+                <p className="mt-2 font-display text-sm font-bold text-bronze-700">ثبات طويل</p>
+              </div>
+            </div>
+          </div>
+          <div className="aspect-[4/3] overflow-hidden rounded-3xl shadow-card">
+            <img
+              src="https://images.pexels.com/photos/29538704/pexels-photo-29538704.jpeg?auto=compress&cs=tinysrgb&w=1200"
+              alt="فن صناعة العطور"
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
